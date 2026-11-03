@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+VENV/
+
+
+# Jupyter
+.ipynb_checkpoints/
+
+# mac OS
+.DS_Store
+
+# Environment / secrets
+.env
+
+# Project data
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep directory structure in Git
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+

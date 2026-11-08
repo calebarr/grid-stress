@@ -1,0 +1,123 @@
+import os
+import json
+import requests
+from pathlib import Path
+import pandas as pd
+
+# Locate the repository root directory
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Google Drive storage location
+GOOGLE_DRIVE_DIR = (
+    Path.home() / "Library/CloudStorage/GoogleDrive-calebar@umich.edu"
+    / "My Drive/grid-stress-data/raw/pjm_load"
+)
+
+# Use Google Drive by default, or an explicitly configured location
+RAW_DATA_DIR = Path(
+    os.environ.get("GRID_STRESS_RAW_DIR", str(GOOGLE_DRIVE_DIR))
+)
+
+def save_raw_data(df: pd.DataFrame, filename: str) -> Path:
+    """
+    Save acquired data without project-specific transformations.
+    """
+    # Ensure the raw data directory exists
+    RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    output_path = RAW_DATA_DIR / filename
+    df.to_csv(output_path, index=False)
+
+    print(f"Saved raw data to {output_path}")
+
+    return output_path
+
+
+
+# PJM hourly metered load endpoint
+ENDPOINT = "hrl_load_metered"
+
+def download_pjm_load_data(base_url, start_ept, end_ept, api_key, raw_dir):
+    """
+    Download PJM hourly metered load data.
+
+    Configuration is provided by main.py.
+    """
+    raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    session = requests.Session()
+    session.headers.update({
+        'Ocp-Apim-Subscription-Key': api_key,
+        'Accept': 'application/json'
+    })
+
+    print("Downloading PJM hourly metered load data...")
+    print(f"Date range: {start_ept} to {end_ept}")
+
+    params = {
+        "datetime_beginning_ept": f"{start_ept} to {end_ept}",
+        "zone": "DOM",
+        "rowCount": 1000,
+        "startRow": 1
+    }
+
+    response = session.get(
+        f"{base_url}/{ENDPOINT}",
+        params=params,
+        timeout=120
+    )
+
+    response.raise_for_status()  # Raise an error for bad responses
+    data = response.json()
+
+    records = data.get("items", [])
+    total_rows = data.get("totalRows", 0)
+
+    print("Rows downloaded:", len(records))
+    print("Total matching:", total_rows)
+
+    if len(records) != total_rows:
+        raise ValueError(
+            "Incomplete download. Pagination is required."
+        )
+
+    if not records:
+        raise RuntimeError("No records returned from the PJM API.")
+
+    # Save original API response
+    json_file = raw_dir / "pjm_dom_hourly_load.json"
+
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    # Save hourly records as CSV
+    df = pd.DataFrame(records)
+    csv_file = raw_dir / "pjm_dom_hourly_load.csv"
+    df.to_csv(csv_file, index=False)
+
+    print("JSON saved:" , json_file)
+    print("CSV saved:" , csv_file)
+    print("Download complete.")
+
+    return df
+
+if __name__ == "__main__":
+    print("PJM Load Ingestion Pipeline")
+    print(f"Raw Data Directory: {RAW_DATA_DIR}")
+
+    """
+    Synthetic data for testing storage only
+    test_data = pd.DataFrame({
+        "datetime":[
+            "2024-01-01 00:00:00",
+            "2024-01-01 01:00:00",
+            "2024-01-01 02:00:00"
+            ],
+            "zone": ["DOM", "DOM", "DOM"],
+                "load_mw": [15000, 15200, 14800]
+        })
+
+    save_raw_data(test_data, "test_pjm_load.csv")
+
+    """

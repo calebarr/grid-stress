@@ -8,6 +8,7 @@ env/
 venv/
 ENV/
 VENV/
+.venv/
 
 
 # Jupyter
@@ -18,9 +19,14 @@ VENV/
 
 # Environment / secrets
 .env
+.env.*
+!.env.example
 
 # Project data
-data/raw/*
+data/raw/**
+!data/raw/**/
+!data/raw/**/.gitkeep
+
 data/interim/*
 data/processed/*
 

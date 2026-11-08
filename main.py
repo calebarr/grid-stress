@@ -1,10 +1,12 @@
 from pathlib import Path
+from datetime import datetime
 import os
 
 from dotenv import load_dotenv
 
 from src.ingestion.download_pjm_load import download_pjm_load_data
 from src.cleaning.validate_pjm_load import validate_pjm_load
+from src.utils.date_ranges import generate_monthly_ranges
 
 # ---------------------------
 # Project configuration
@@ -26,7 +28,7 @@ if not API_KEY:
 BASE_URL = 'https://api.pjm.com/api/v1'
 
 START_EPT = '01-01-2023 00:00'
-END_EPT = '01-31-2023 23:00'
+END_EPT = '03-31-2023 23:00'
 
 # ---------------------------
 # Main pipeline
@@ -37,22 +39,31 @@ def main():
     print(f"Date range: {START_EPT} to {END_EPT}")
     print("PJM API credentials loaded successfully.")
 
-    # Output directory
-    raw_dir = PROJECT_ROOT / "data" / "raw" / "pjm" / "2023-01"
+    # Generate monthly date ranges
+    monthly_ranges = generate_monthly_ranges(START_EPT, END_EPT)
 
-    # Step 1: Download hourly metered load data
-    df_load = download_pjm_load_data(
-        base_url = BASE_URL,
-        start_ept = START_EPT,
-        end_ept = END_EPT,
-        api_key = API_KEY,
-        raw_dir = raw_dir
-    )
+    for month_start, month_end in monthly_ranges:
+        print(f"\nProcessing: {month_start} to {month_end}")
 
-    print(f"PJM hourly load downloaded: {len(df_load)} rows")
+        # Generate monthly output directory
+        start_date = datetime.strptime(month_start, "%m-%d-%Y %H:%M")
+        month_folder = start_date.strftime("%Y-%m")
 
-    # Step 2: Validate hourly metered load data
-    validate_pjm_load(df_load)
+        raw_dir = PROJECT_ROOT / "data" / "raw" / "pjm" / month_folder
+
+        # Step 1: Download hourly metered load data
+        df_load = download_pjm_load_data(
+            base_url=BASE_URL,
+            start_ept=month_start,
+            end_ept=month_end,
+            api_key=API_KEY,
+            raw_dir=raw_dir
+        )
+
+        print(f"PJM hourly load downloaded: {len(df_load)} rows")
+
+        # Step 2: Validate hourly metered load data
+        validate_pjm_load(df_load)
 
     # Future pipeline stages:
     # 1. Download hourly metered load

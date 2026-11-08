@@ -55,41 +55,69 @@ def download_pjm_load_data(base_url, start_ept, end_ept, api_key, raw_dir):
     print("Downloading PJM hourly metered load data...")
     print(f"Date range: {start_ept} to {end_ept}")
 
-    params = {
-        "datetime_beginning_ept": f"{start_ept} to {end_ept}",
-        "zone": "DOM",
-        "rowCount": 1000,
-        "startRow": 1
-    }
+    # Download all availabe pages
+    records = []
+    page_size = 1000
+    start_row = 1
+    total_rows = None
 
-    response = session.get(
-        f"{base_url}/{ENDPOINT}",
-        params=params,
-        timeout=120
-    )
+    while True:
+        params = {
+            "datetime_beginning_ept": f"{start_ept} to {end_ept}",
+            "zone": "DOM",
+            "rowCount": page_size,
+            "startRow": start_row
+        }
 
-    response.raise_for_status()  # Raise an error for bad responses
-    data = response.json()
+        response = session.get(
+            f"{base_url}/{ENDPOINT}",
+            params=params,
+            timeout=120
+        )
 
-    records = data.get("items", [])
-    total_rows = data.get("totalRows", 0)
+        response.raise_for_status()
+        data = response.json()
 
-    print("Rows downloaded:", len(records))
-    print("Total matching:", total_rows)
+        page_records = data.get("items", [])
+
+        if total_rows is None:
+            total_rows = int(data["totalRows"])
+            print(f"Total matching records: {total_rows}")
+
+        if not page_records:
+            break
+
+        records.extend(page_records)
+
+        print(f"Download {len(records)} of {total_rows} records")
+
+        if len(records) >= total_rows:
+            break
+
+        start_row += len(page_records)
 
     if len(records) != total_rows:
         raise ValueError(
-            "Incomplete download. Pagination is required."
+            f"Incomplete download: expected {total_rows}, "
+            f"receiced {len(records)}."
         )
 
     if not records:
         raise RuntimeError("No records returned from the PJM API.")
 
-    # Save original API response
+    # Save consolidated API records from all pages
     json_file = raw_dir / "pjm_dom_hourly_load.json"
 
     with open(json_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(
+            {
+                "totalRows": total_rows,
+                "items": records
+            },
+            f,
+            indent=2
+
+        )
 
     # Save hourly records as CSV
     df = pd.DataFrame(records)

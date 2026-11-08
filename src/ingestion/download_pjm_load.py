@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 from pathlib import Path
 import pandas as pd
 
@@ -69,11 +70,42 @@ def download_pjm_load_data(base_url, start_ept, end_ept, api_key, raw_dir):
             "startRow": start_row
         }
 
-        response = session.get(
-            f"{base_url}/{ENDPOINT}",
-            params=params,
-            timeout=120
-        )
+        # Retry rate-limited requests without advancing pagination
+        max_attempts = 4
+
+        for attempt in range(1, max_attempts + 1):
+            response = session.get(
+                f"{base_url}/{ENDPOINT}",
+                params=params,
+                timeout=120
+            )
+
+            # Check whether PJM has reached its API rate limit
+            if response.status_code != 429:
+                response.raise_for_status()
+                break
+
+            if attempt == max_attempts:
+                response.raise_for_status()
+
+            retry_after = response.headers.get("Retry-After")
+
+            try:
+                wait_seconds = float(retry_after)
+                if not 0 < wait_seconds <= 300:
+                    raise ValueError
+            except (TypeError, ValueError):
+                wait_seconds = 5 * (2 ** (attempt -1))
+
+            print(
+                f"PJM rate limit reached (attempt "
+                f"{attempt}/{max_attempts}). "
+                f"Retrying in {wait_seconds:g} seconds..."
+            )
+
+            time.sleep(wait_seconds)
+
+        data = response.json()
 
         response.raise_for_status()
         data = response.json()

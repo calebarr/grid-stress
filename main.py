@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 import os
+import pandas as pd
 
 from dotenv import load_dotenv
 
@@ -27,8 +28,8 @@ if not API_KEY:
 # ---------------------------
 BASE_URL = 'https://api.pjm.com/api/v1'
 
-START_EPT = '11-01-2023 00:00'
-END_EPT = '11-30-2023 23:00'
+START_EPT = '12-01-2023 00:00'
+END_EPT = '12-31-2023 23:00'
 
 # ---------------------------
 # Main pipeline
@@ -54,6 +55,24 @@ def main():
         )
 
         raw_dir = google_drive_root / month_folder
+
+        # Check whether monthly files already exist
+        csv_file = raw_dir / "pjm_dom_hourly_load.csv"
+        json_file = raw_dir / "pjm_dom_hourly_load.json"
+
+        if csv_file.is_file() and json_file.is_file():
+            print(f"Existing monthly files found: {month_folder}")
+
+            existing_df = pd.read_csv(csv_file)
+
+            validate_pjm_load(
+                existing_df,
+                start_ept=month_start,
+                end_ept=month_end
+            )
+
+            print(f"Existing data validated: {month_folder}")
+            continue
 
         # Step 1: Download hourly metered load data
         df_load = download_pjm_load_data(

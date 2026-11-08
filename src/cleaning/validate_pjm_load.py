@@ -1,6 +1,12 @@
 import pandas as pd
+from datetime import datetime
 
-def validate_pjm_load(df: pd.DataFrame) -> None:
+def validate_pjm_load(
+        df: pd.DataFrame,
+        start_ept: str,
+        end_ept: str
+) -> None:
+
     """
     Validate the PJM Dominion hourly metered load data.
 
@@ -66,5 +72,37 @@ def validate_pjm_load(df: pd.DataFrame) -> None:
         raise ValueError(
             f"Missing {len(missing_hours)} hourly intervals in PJM data."
         )
+
+    # 8. Validate requested date boundaries
+    date_format = "%m-%d-%Y %H:%M"
+
+    requested_start = datetime.strptime(start_ept, date_format)
+    requested_end = datetime.strptime(end_ept, date_format)
+
+    expected_start_utc = (
+        pd.Timestamp(requested_start)
+        .tz_localize("America/New_York")
+        .tz_convert("UTC")
+    )
+
+    expected_end_utc = (
+        pd.Timestamp(requested_end)
+        .tz_localize("America/New_York")
+        .tz_convert("UTC")
+    )
+
+    # Verify the first timestamp
+    if timestamps.min() != expected_start_utc:
+        raise ValueError(
+            f"Incorrect start boundary: expected {expected_start_utc}, "
+            f"received {timestamps.min()}."
+        )
+
+    if timestamps.max() != expected_end_utc:
+        raise ValueError(
+            f"Incorrect end boundary: expected {expected_end_utc}, "
+            f"received {timestamps.max()}."
+        )
+
 
     print(f"Validation successful: {len(df)} hourly records.")

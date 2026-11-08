@@ -27,8 +27,8 @@ if not API_KEY:
 # ---------------------------
 BASE_URL = 'https://api.pjm.com/api/v1'
 
-START_EPT = '01-01-2023 00:00'
-END_EPT = '03-31-2023 23:00'
+START_EPT = '11-01-2023 00:00'
+END_EPT = '11-30-2023 23:00'
 
 # ---------------------------
 # Main pipeline
@@ -49,7 +49,11 @@ def main():
         start_date = datetime.strptime(month_start, "%m-%d-%Y %H:%M")
         month_folder = start_date.strftime("%Y-%m")
 
-        raw_dir = PROJECT_ROOT / "data" / "raw" / "pjm" / month_folder
+        google_drive_root = Path(
+            os.environ["GRID_STRESS_RAW_DIR"]
+        )
+
+        raw_dir = google_drive_root / month_folder
 
         # Step 1: Download hourly metered load data
         df_load = download_pjm_load_data(
@@ -63,7 +67,11 @@ def main():
         print(f"PJM hourly load downloaded: {len(df_load)} rows")
 
         # Step 2: Validate hourly metered load data
-        validate_pjm_load(df_load)
+        validate_pjm_load(
+            df_load,
+            start_ept=month_start,
+            end_ept=month_end
+        )
 
     # Future pipeline stages:
     # 1. Download hourly metered load

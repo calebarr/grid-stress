@@ -35,4 +35,8 @@ data/processed/*
 !data/interim/.gitkeep
 !data/processed/.gitkeep
 
+# Local development settings
+.vscode/
 
+# Legacy development notebooks
+notebooks/01_pjm_load_ingestion.ipynb
